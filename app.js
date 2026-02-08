@@ -25,6 +25,8 @@ const state = {
   includeStudyInQuizOnly: false,
   timer: STUDY_SECONDS,
   timerRef: null,
+  timerStartMs: null,
+  timerEndMs: null,
   quiz: null,
   result: null,
 };
@@ -45,6 +47,8 @@ function makeSections(items, count) {
 function setScreen(screen) {
   clearInterval(state.timerRef);
   state.timerRef = null;
+  state.timerStartMs = null;
+  state.timerEndMs = null;
   state.screen = screen;
   render();
 }
@@ -65,15 +69,27 @@ function beginStudy(letters, label) {
   state.studyLetters = letters;
   state.studyLabel = label;
   setScreen('study');
-  state.timerRef = setInterval(() => {
-    state.timer -= 1;
-    render();
-    if (state.timer <= 0) {
+
+  state.timerStartMs = performance.now();
+  state.timerEndMs = state.timerStartMs + STUDY_SECONDS * 1000;
+
+  const updateTimerText = () => {
+    const timerValue = document.querySelector('[data-timer-value]');
+    const remainingMs = Math.max(0, state.timerEndMs - performance.now());
+    const remainingSeconds = Math.ceil(remainingMs / 1000);
+
+    state.timer = remainingSeconds;
+    if (timerValue) timerValue.textContent = `${remainingSeconds}s`;
+
+    if (remainingMs <= 0) {
       clearInterval(state.timerRef);
       state.timerRef = null;
       startQuiz(letters, state.mode === 'learn');
     }
-  }, 1000);
+  };
+
+  updateTimerText();
+  state.timerRef = setInterval(updateTimerText, 100);
 }
 
 function shuffle(arr) {
@@ -208,7 +224,6 @@ function renderMenu() {
 }
 
 function renderStudy() {
-  const pctLeft = (state.timer / STUDY_SECONDS) * 100;
   return `
     <section class="screen">
       <header class="study-header">
@@ -217,8 +232,8 @@ function renderStudy() {
           <p class="meta">Observe silently. Quiz starts automatically.</p>
         </div>
         <div class="countdown-wrap" aria-label="countdown">
-          <div class="countdown-bar"><div class="countdown-fill" style="width:${pctLeft}%"></div></div>
-          <p class="meta">${state.timer}s</p>
+          <div class="countdown-bar"><div class="countdown-fill" style="--study-duration:${STUDY_SECONDS}s"></div></div>
+          <p class="meta countdown-time" data-timer-value>${state.timer}s</p>
         </div>
       </header>
       <div class="chart">
