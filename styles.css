@@ -30,6 +30,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  transform: rotateY(180deg);
 }
 
 .screen {
@@ -40,12 +41,12 @@ body {
   box-shadow: var(--shadow);
   padding: clamp(20px, 3vw, 32px);
   opacity: 0;
-  transform: translateY(14px) scale(0.99);
+  transform: rotateY(180deg) translateY(14px) scale(0.99);
   animation: screenIn 360ms ease forwards;
 }
 
 @keyframes screenIn {
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 1; transform: rotateY(180deg) translateY(0) scale(1); }
 }
 
 h1, h2, h3, p { margin: 0; }
@@ -119,7 +120,20 @@ button.bad { background: color-mix(in srgb, var(--bad), #000 75%); }
   height: 100%;
   background: linear-gradient(90deg, #6c8cff, #8ea4ff);
   width: 100%;
-  transition: width 1s linear;
+  transform-origin: left center;
+  will-change: transform;
+  animation: countdownDrain var(--study-duration, 20s) linear forwards;
+}
+
+.countdown-time {
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes countdownDrain {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
 }
 
 .chart {
@@ -144,6 +158,7 @@ button.bad { background: color-mix(in srgb, var(--bad), #000 75%); }
   font-family: 'Aurebesh', 'Inter', sans-serif;
   font-size: 2.1rem;
   letter-spacing: 0.06em;
+  transform: rotateY(180deg);
 }
 
 .latin {
