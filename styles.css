@@ -158,6 +158,7 @@ button.bad { background: color-mix(in srgb, var(--bad), #000 75%); }
   font-family: 'Aurebesh', 'Inter', sans-serif;
   font-size: 2.1rem;
   letter-spacing: 0.06em;
+  transform: rotateY(180deg);
 }
 
 .latin {
