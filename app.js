@@ -1,5 +1,17 @@
 const app = document.getElementById('app');
 
+const DIGRAPH_LATIN = new Set(['ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
+
+function getGlyphSymbol(latin) {
+  const value = latin.toLowerCase();
+
+  if (!DIGRAPH_LATIN.has(value)) {
+    return value;
+  }
+
+  return `${value}\u200d${value[0]}`;
+}
+
 const LETTERS = [
   ['a', 'aurek'], ['b', 'besh'], ['c', 'cresh'], ['d', 'dorn'], ['e', 'esk'], ['f', 'forn'],
   ['g', 'grek'], ['h', 'herf'], ['i', 'isk'], ['j', 'jenth'], ['k', 'krill'], ['l', 'leth'],
@@ -7,10 +19,11 @@ const LETTERS = [
   ['s', 'senth'], ['t', 'trill'], ['u', 'usk'], ['v', 'vev'], ['w', 'wesk'], ['x', 'xesh'],
   ['y', 'yirt'], ['z', 'zerek'], ['ch', 'cherek'], ['ae', 'enth'], ['eo', 'onith'], ['kh', 'krenth'],
   ['ng', 'nen'], ['oo', 'orenth'], ['sh', 'shen'], ['th', 'thesh']
-].map(([latin, name], idx) => ({ id: idx + 1, latin, name, symbol: latin.toUpperCase() }));
+].map(([latin, name], idx) => ({ id: idx + 1, latin, name, symbol: getGlyphSymbol(latin) }));
 
 const SECTION_COUNT = 6;
 const STUDY_SECONDS = 20;
+const SKIP_SECTION_INCREMENT = 2;
 const sections = makeSections(LETTERS, SECTION_COUNT);
 const learningStages = [
   ...sections.map((_, i) => [i]),
@@ -59,8 +72,12 @@ function getStageLetters() {
 }
 
 function startLearning() {
+  setScreen('learn-entry');
+}
+
+function launchLearning(skipAhead = false) {
   state.mode = 'learn';
-  state.stageIndex = 0;
+  state.stageIndex = skipAhead ? Math.min(SKIP_SECTION_INCREMENT, sections.length - 1) : 0;
   beginStudy(getStageLetters(), `Section ${state.stageIndex + 1} of ${sections.length}`);
 }
 
@@ -223,6 +240,22 @@ function renderMenu() {
   `;
 }
 
+function renderLearningEntry() {
+  return `
+    <section class="screen center-stack">
+      <div>
+        <h2>Start Learning Quiz</h2>
+        <p class="meta">Start from section 1 or skip ahead in section-based progression.</p>
+      </div>
+      <div class="actions">
+        <button class="primary" onclick="launchLearning(false)">Start Normally</button>
+        <button class="ghost" onclick="launchLearning(true)">Skip Ahead (+${SKIP_SECTION_INCREMENT} sections)</button>
+        <button class="ghost" onclick="setScreen('menu')">Cancel</button>
+      </div>
+    </section>
+  `;
+}
+
 function renderStudy() {
   return `
     <section class="screen">
@@ -346,6 +379,7 @@ function renderComplete() {
 function render() {
   const views = {
     menu: renderMenu,
+    'learn-entry': renderLearningEntry,
     study: renderStudy,
     quiz: renderQuiz,
     result: renderResult,
@@ -359,6 +393,7 @@ function render() {
 Object.assign(window, {
   state,
   startLearning,
+  launchLearning,
   startQuizOnly,
   launchQuizOnly,
   setScreen,
