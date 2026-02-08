@@ -4,12 +4,7 @@ const DIGRAPH_LATIN = new Set(['ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
 
 function getGlyphSymbol(latin) {
   const value = latin.toLowerCase();
-
-  if (!DIGRAPH_LATIN.has(value)) {
-    return value;
-  }
-
-  return `${value}\u200d${value[0]}`;
+  return value;
 }
 
 const LETTERS = [
@@ -24,17 +19,19 @@ const LETTERS = [
 const SECTION_COUNT = 6;
 const STUDY_SECONDS = 20;
 const SKIP_SECTION_INCREMENT = 2;
-const sections = makeSections(LETTERS, SECTION_COUNT);
-const learningStages = [
-  ...sections.map((_, i) => [i]),
-  ...Array.from({ length: sections.length - 1 }, (_, i) => Array.from({ length: i + 2 }, (_, n) => n)),
-];
+const DOUBLE_LETTERS = LETTERS.filter((letter) => DIGRAPH_LATIN.has(letter.latin));
+
+const learningTracks = {
+  standard: makeLearningTrack(LETTERS, SECTION_COUNT, 'Aurebesh'),
+  double: makeLearningTrack(DOUBLE_LETTERS, Math.min(4, DOUBLE_LETTERS.length), 'Double-Letter'),
+};
 
 const state = {
   screen: 'menu',
   mode: 'learn',
+  learningTrack: 'standard',
   stageIndex: 0,
-  sectionSelection: sections.map(() => false),
+  sectionSelection: learningTracks.standard.sections.map(() => false),
   includeStudyInQuizOnly: false,
   timer: STUDY_SECONDS,
   timerRef: null,
@@ -57,6 +54,35 @@ function makeSections(items, count) {
   return out;
 }
 
+function makeLearningTrack(letters, sectionCount, label) {
+  const sections = makeSections(letters, sectionCount).filter((section) => section.length);
+  const stages = [
+    ...sections.map((_, i) => [i]),
+    ...Array.from({ length: sections.length - 1 }, (_, i) => Array.from({ length: i + 2 }, (_, n) => n)),
+  ];
+
+  return { label, sections, stages };
+}
+
+function getLearningTrack() {
+  return learningTracks[state.learningTrack] || learningTracks.standard;
+}
+
+function getSkipIncrement() {
+  return Math.min(SKIP_SECTION_INCREMENT, getLearningTrack().sections.length - 1);
+}
+
+function getStageLabel(stageIndex) {
+  const track = getLearningTrack();
+  const stage = track.stages[stageIndex] || [];
+
+  if (stage.length <= 1) {
+    return `${track.label} Section ${stage[0] + 1} of ${track.sections.length}`;
+  }
+
+  return `${track.label} Combined Review: ${stage.length} sections`;
+}
+
 function setScreen(screen) {
   clearInterval(state.timerRef);
   state.timerRef = null;
@@ -67,18 +93,20 @@ function setScreen(screen) {
 }
 
 function getStageLetters() {
-  const groups = learningStages[state.stageIndex] || [];
-  return groups.flatMap((i) => sections[i]);
+  const track = getLearningTrack();
+  const groups = track.stages[state.stageIndex] || [];
+  return groups.flatMap((i) => track.sections[i]);
 }
 
 function startLearning() {
   setScreen('learn-entry');
 }
 
-function launchLearning(skipAhead = false) {
+function launchLearning(skipAhead = false, track = 'standard') {
   state.mode = 'learn';
-  state.stageIndex = skipAhead ? Math.min(SKIP_SECTION_INCREMENT, sections.length - 1) : 0;
-  beginStudy(getStageLetters(), `Section ${state.stageIndex + 1} of ${sections.length}`);
+  state.learningTrack = track;
+  state.stageIndex = skipAhead ? getSkipIncrement() : 0;
+  beginStudy(getStageLetters(), getStageLabel(state.stageIndex));
 }
 
 function beginStudy(letters, label) {
@@ -188,21 +216,19 @@ function continueFromResult() {
   }
 
   if (!state.result.passed) {
-    beginStudy(getStageLetters(), `Section ${state.stageIndex + 1} of ${sections.length}`);
+    beginStudy(getStageLetters(), getStageLabel(state.stageIndex));
     return;
   }
 
   state.stageIndex += 1;
-  if (state.stageIndex >= learningStages.length) {
+  const track = getLearningTrack();
+  if (state.stageIndex >= track.stages.length) {
     setScreen('complete');
     return;
   }
 
   const letters = getStageLetters();
-  const stage = learningStages[state.stageIndex];
-  const label = stage.length === 1
-    ? `Section ${stage[0] + 1} of ${sections.length}`
-    : `Combined Review: ${stage.length} sections`;
+  const label = getStageLabel(state.stageIndex);
 
   beginStudy(letters, label);
 }
@@ -213,6 +239,7 @@ function startQuizOnly() {
 }
 
 function launchQuizOnly() {
+  const sections = learningTracks.standard.sections;
   let picked = state.sectionSelection
     .flatMap((checked, i) => checked ? sections[i] : []);
 
@@ -241,15 +268,24 @@ function renderMenu() {
 }
 
 function renderLearningEntry() {
+  const skip = getSkipIncrement();
+  const disableSkip = skip === 0;
+
   return `
     <section class="screen center-stack">
       <div>
         <h2>Start Learning Quiz</h2>
-        <p class="meta">Start from section 1 or skip ahead in section-based progression.</p>
+        <p class="meta">Choose a learning track, then start from section 1 or skip ahead in section-based progression.</p>
       </div>
-      <div class="actions">
-        <button class="primary" onclick="launchLearning(false)">Start Normally</button>
-        <button class="ghost" onclick="launchLearning(true)">Skip Ahead (+${SKIP_SECTION_INCREMENT} sections)</button>
+      <div class="track-actions">
+        <div class="actions">
+          <button class="primary" onclick="launchLearning(false, 'standard')">Start Standard Mode</button>
+          <button class="ghost" onclick="launchLearning(true, 'standard')" ${disableSkip ? 'disabled' : ''}>Skip Ahead Standard (+${skip} sections)</button>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="launchLearning(false, 'double')">Start Double-Letter Mode</button>
+          <button class="ghost" onclick="launchLearning(true, 'double')" ${disableSkip ? 'disabled' : ''}>Skip Ahead Double-Letter (+${skip} sections)</button>
+        </div>
         <button class="ghost" onclick="setScreen('menu')">Cancel</button>
       </div>
     </section>
@@ -338,6 +374,7 @@ function renderResult() {
 }
 
 function renderQuizSetup() {
+  const sections = learningTracks.standard.sections;
   return `
     <section class="screen">
       <h2 style="margin-bottom:10px;">Quiz Setup</h2>

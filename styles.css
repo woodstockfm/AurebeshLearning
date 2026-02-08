@@ -253,6 +253,19 @@ button.bad { background: color-mix(in srgb, var(--bad), #000 75%); }
   gap: 8px;
 }
 
+
+.track-actions {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
 label.pill {
   background: var(--surface-2);
   border: 1px solid var(--border);
