@@ -1,18 +1,17 @@
 const app = document.getElementById('app');
 
-const DIGRAPH_LATIN = new Set(['ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
-
 const GLYPH_BY_LATIN = {
   a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'h', i: 'i', j: 'j',
   k: 'k', l: 'l', m: 'm', n: 'n', o: 'o', p: 'p', q: 'q', r: 'r', s: 's', t: 't',
-  u: 'u', v: 'v', w: 'w', x: 'x', y: 'y', z: 'z', ch: 'ch', ae: 'ae', eo: 'eo',
-  kh: 'kh', ng: 'ng', oo: 'oo', sh: 'sh', th: 'th',
+  u: 'u', v: 'v', w: 'w', x: 'x', z: 'z',
+  ch: 'ch', ae: 'ae', eo: 'eo', kh: 'kh', ng: 'ng', oo: 'oo', sh: 'sh', th: 'th', yy: 'yy',
+  0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9',
 };
 
 const SYMBOL_KEYS_DESC = Object.keys(GLYPH_BY_LATIN).sort((a, b) => b.length - a.length);
 
 function getGlyphSymbol(text) {
-  const source = text.toLowerCase();
+  const source = String(text).toLowerCase();
   const glyphs = [];
   let index = 0;
 
@@ -39,23 +38,38 @@ function getGlyphSymbol(text) {
   return glyphs.join('');
 }
 
-const LETTERS = [
+const ALPHABET_LETTERS = [
   ['a', 'aurek'], ['b', 'besh'], ['c', 'cresh'], ['d', 'dorn'], ['e', 'esk'], ['f', 'forn'],
   ['g', 'grek'], ['h', 'herf'], ['i', 'isk'], ['j', 'jenth'], ['k', 'krill'], ['l', 'leth'],
   ['m', 'mern'], ['n', 'nern'], ['o', 'osk'], ['p', 'peth'], ['q', 'qek'], ['r', 'resh'],
   ['s', 'senth'], ['t', 'trill'], ['u', 'usk'], ['v', 'vev'], ['w', 'wesk'], ['x', 'xesh'],
-  ['y', 'yirt'], ['z', 'zerek'], ['ch', 'cherek'], ['ae', 'enth'], ['eo', 'onith'], ['kh', 'krenth'],
-  ['ng', 'nen'], ['oo', 'orenth'], ['sh', 'shen'], ['th', 'thesh']
-].map(([latin, name], idx) => ({ id: idx + 1, latin, name, symbol: getGlyphSymbol(latin) }));
+  ['yy', 'yirt'], ['z', 'zerek'], ['ch', 'cherek'], ['ae', 'enth'], ['eo', 'onith'], ['kh', 'krenth'],
+  ['ng', 'nen'], ['oo', 'orenth'], ['sh', 'shen'], ['th', 'thesh'],
+].map(([latin, name], idx) => ({ id: idx + 1, latin, name, symbol: getGlyphSymbol(latin), type: 'alphabet' }));
+
+const NUMBER_GLYPHS = Array.from({ length: 10 }, (_, n) => ({
+  id: 100 + n,
+  latin: String(n),
+  name: `numeral ${n}`,
+  symbol: getGlyphSymbol(String(n)),
+  type: 'numbers',
+}));
+
+const DOUBLE_LATIN = new Set(['yy', 'ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
+const PRONUNCIATION_LATIN = new Set(['ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
+const DOUBLE_LETTERS = ALPHABET_LETTERS.filter((letter) => DOUBLE_LATIN.has(letter.latin));
+const PRONUNCIATION_LETTERS = ALPHABET_LETTERS.filter((letter) => PRONUNCIATION_LATIN.has(letter.latin));
+const ALL_LEARNING_ITEMS = [...ALPHABET_LETTERS, ...NUMBER_GLYPHS];
 
 const SECTION_COUNT = 6;
 const STUDY_SECONDS = 20;
 const SKIP_SECTION_INCREMENT = 2;
-const DOUBLE_LETTERS = LETTERS.filter((letter) => DIGRAPH_LATIN.has(letter.latin));
 
 const learningTracks = {
-  standard: makeLearningTrack(LETTERS, SECTION_COUNT, 'Aurebesh'),
+  standard: makeLearningTrack(ALPHABET_LETTERS, SECTION_COUNT, 'Aurebesh'),
   double: makeLearningTrack(DOUBLE_LETTERS, Math.min(4, DOUBLE_LETTERS.length), 'Double-Letter'),
+  pronunciation: makeLearningTrack(PRONUNCIATION_LETTERS, Math.min(4, PRONUNCIATION_LETTERS.length), 'Pronunciation'),
+  numbers: makeLearningTrack(NUMBER_GLYPHS, 4, 'Numbers'),
 };
 
 const state = {
@@ -64,6 +78,11 @@ const state = {
   learningTrack: 'standard',
   stageIndex: 0,
   sectionSelection: learningTracks.standard.sections.map(() => false),
+  quizExtras: {
+    double: false,
+    pronunciation: false,
+    numbers: false,
+  },
   includeStudyInQuizOnly: false,
   timer: STUDY_SECONDS,
   timerRef: null,
@@ -174,8 +193,9 @@ function shuffle(arr) {
 }
 
 function makeQuiz(letters) {
+  const pool = letters.length > 3 ? letters : ALL_LEARNING_ITEMS;
   const questions = shuffle(letters).map((item) => {
-    const wrong = shuffle(LETTERS.filter((l) => l.latin !== item.latin)).slice(0, 3);
+    const wrong = shuffle(pool.filter((l) => l.latin !== item.latin)).slice(0, 3);
     return {
       item,
       selected: null,
@@ -201,22 +221,22 @@ function startQuiz(letters, masteryRequired = false) {
 function answer(option) {
   const q = state.quiz.questions[state.quiz.idx];
   if (!q || q.selected) return;
+
   q.selected = option.latin;
   q.correct = option.latin === q.item.latin;
+  render();
 
   setTimeout(() => {
     if (state.quiz.idx < state.quiz.questions.length - 1) {
       state.quiz.idx += 1;
       render();
-      return;
+    } else {
+      finalizeQuiz();
     }
-    finishQuiz();
-  }, 220);
-
-  render();
+  }, 350);
 }
 
-function finishQuiz() {
+function finalizeQuiz() {
   const questions = state.quiz.questions;
   const correct = questions.filter((q) => q.correct).length;
   const total = questions.length;
@@ -270,12 +290,27 @@ function startQuizOnly() {
   setScreen('quiz-setup');
 }
 
+function uniqueByLatin(items) {
+  const seen = new Set();
+  return items.filter((item) => {
+    if (seen.has(item.latin)) return false;
+    seen.add(item.latin);
+    return true;
+  });
+}
+
 function launchQuizOnly() {
   const sections = learningTracks.standard.sections;
   let picked = state.sectionSelection
-    .flatMap((checked, i) => checked ? sections[i] : []);
+    .flatMap((checked, i) => (checked ? sections[i] : []));
 
-  if (!picked.length) picked = LETTERS;
+  if (!picked.length) picked = ALPHABET_LETTERS;
+
+  if (state.quizExtras.double) picked.push(...DOUBLE_LETTERS);
+  if (state.quizExtras.pronunciation) picked.push(...PRONUNCIATION_LETTERS);
+  if (state.quizExtras.numbers) picked.push(...NUMBER_GLYPHS);
+
+  picked = uniqueByLatin(picked);
 
   if (state.includeStudyInQuizOnly) {
     beginStudy(picked, `Quiz Prep • ${picked.length} glyphs`);
@@ -317,6 +352,10 @@ function renderLearningEntry() {
         <div class="actions">
           <button class="primary" onclick="launchLearning(false, 'double')">Start Double-Letter Mode</button>
           <button class="ghost" onclick="launchLearning(true, 'double')" ${disableSkip ? 'disabled' : ''}>Skip Ahead Double-Letter (+${skip} sections)</button>
+        </div>
+        <div class="actions">
+          <button class="primary" onclick="launchLearning(false, 'pronunciation')">Start Pronunciation Mode</button>
+          <button class="ghost" onclick="launchLearning(false, 'numbers')">Start Numbers Mode</button>
         </div>
         <button class="ghost" onclick="setScreen('menu')">Cancel</button>
       </div>
@@ -410,7 +449,8 @@ function renderQuizSetup() {
   return `
     <section class="screen">
       <h2 style="margin-bottom:10px;">Quiz Setup</h2>
-      <p class="meta" style="margin-bottom:16px;">Choose sections or leave all unchecked for the full alphabet.</p>
+      <p class="meta" style="margin-bottom:16px;">Choose core sections and extra quiz check marks for double letters, pronunciation, and numbers.</p>
+      <h3 style="margin-bottom:8px;">Core Alphabet Sections</h3>
       <div class="pills" style="margin-bottom:14px;">
         ${sections.map((section, i) => `
           <label class="pill">
@@ -419,6 +459,24 @@ function renderQuizSetup() {
             Section ${i + 1} (${section.length})
           </label>
         `).join('')}
+      </div>
+      <h3 style="margin-bottom:8px;">Extra Sets</h3>
+      <div class="pills" style="margin-bottom:14px;">
+        <label class="pill">
+          <input type="checkbox" ${state.quizExtras.double ? 'checked' : ''}
+            onchange="state.quizExtras.double = this.checked" />
+          Double Letters (${DOUBLE_LETTERS.length})
+        </label>
+        <label class="pill">
+          <input type="checkbox" ${state.quizExtras.pronunciation ? 'checked' : ''}
+            onchange="state.quizExtras.pronunciation = this.checked" />
+          Pronunciation (${PRONUNCIATION_LETTERS.length})
+        </label>
+        <label class="pill">
+          <input type="checkbox" ${state.quizExtras.numbers ? 'checked' : ''}
+            onchange="state.quizExtras.numbers = this.checked" />
+          Numbers (${NUMBER_GLYPHS.length})
+        </label>
       </div>
       <label class="pill" style="margin-bottom:18px;display:inline-flex;">
         <input type="checkbox" ${state.includeStudyInQuizOnly ? 'checked' : ''}
