@@ -1,6 +1,7 @@
 const app = document.getElementById('app');
 
 const DIGRAPH_LATIN = new Set(['ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
+const DIGRAPH_JOINER = '\u200d';
 
 function getGlyphSymbol(latin) {
   const value = latin.toLowerCase();
@@ -10,7 +11,7 @@ function getGlyphSymbol(latin) {
     return glyph;
   }
 
-  return `${glyph}\u200d${glyph[0]}`;
+  return `${glyph}${DIGRAPH_JOINER}${glyph[0]}`;
 }
 
 const LETTERS = [
