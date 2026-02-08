@@ -2,9 +2,41 @@ const app = document.getElementById('app');
 
 const DIGRAPH_LATIN = new Set(['ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
 
-function getGlyphSymbol(latin) {
-  const value = latin.toLowerCase();
-  return value;
+const GLYPH_BY_LATIN = {
+  a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'h', i: 'i', j: 'j',
+  k: 'k', l: 'l', m: 'm', n: 'n', o: 'o', p: 'p', q: 'q', r: 'r', s: 's', t: 't',
+  u: 'u', v: 'v', w: 'w', x: 'x', y: 'y', z: 'z', ch: 'ch', ae: 'ae', eo: 'eo',
+  kh: 'kh', ng: 'ng', oo: 'oo', sh: 'sh', th: 'th',
+};
+
+const SYMBOL_KEYS_DESC = Object.keys(GLYPH_BY_LATIN).sort((a, b) => b.length - a.length);
+
+function getGlyphSymbol(text) {
+  const source = text.toLowerCase();
+  const glyphs = [];
+  let index = 0;
+
+  while (index < source.length) {
+    let matched = null;
+
+    for (const symbol of SYMBOL_KEYS_DESC) {
+      if (source.startsWith(symbol, index)) {
+        matched = symbol;
+        break;
+      }
+    }
+
+    if (matched) {
+      glyphs.push(GLYPH_BY_LATIN[matched]);
+      index += matched.length;
+      continue;
+    }
+
+    glyphs.push(source[index]);
+    index += 1;
+  }
+
+  return glyphs.join('');
 }
 
 const LETTERS = [
