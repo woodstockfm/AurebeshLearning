@@ -1,64 +1,34 @@
+import {
+  AUREBESH,
+  encodeLatinToAurebesh,
+} from './src/aurebesh/alphabet.mjs';
+
 const app = document.getElementById('app');
 
-const GLYPH_BY_LATIN = {
-  a: 'a', b: 'b', c: 'c', d: 'd', e: 'e', f: 'f', g: 'g', h: 'h', i: 'i', j: 'j',
-  k: 'k', l: 'l', m: 'm', n: 'n', o: 'o', p: 'p', q: 'q', r: 'r', s: 's', t: 't',
-  u: 'u', v: 'v', w: 'w', x: 'x', z: 'z',
-  ch: 'ch', ae: 'ae', eo: 'eo', kh: 'kh', ng: 'ng', oo: 'oo', sh: 'sh', th: 'th', yy: 'yy',
-  0: '0', 1: '1', 2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7', 8: '8', 9: '9',
-};
+const ALPHABET_LETTERS = AUREBESH
+  .filter((entry) => entry.kind === 'single' || entry.kind === 'digraph')
+  .map((entry, idx) => ({
+    id: idx + 1,
+    latin: entry.token,
+    name: entry.name,
+    pronunciation: entry.pronunciation,
+    symbol: encodeLatinToAurebesh(entry.token),
+    type: 'alphabet',
+  }));
 
-const SYMBOL_KEYS_DESC = Object.keys(GLYPH_BY_LATIN).sort((a, b) => b.length - a.length);
+const NUMBER_GLYPHS = AUREBESH
+  .filter((entry) => entry.kind === 'digit')
+  .map((entry, idx) => ({
+    id: 100 + idx,
+    latin: entry.token,
+    name: entry.name,
+    pronunciation: entry.pronunciation,
+    symbol: encodeLatinToAurebesh(entry.token),
+    type: 'numbers',
+  }));
 
-function getGlyphSymbol(text) {
-  const source = String(text).toLowerCase();
-  const glyphs = [];
-  let index = 0;
-
-  while (index < source.length) {
-    let matched = null;
-
-    for (const symbol of SYMBOL_KEYS_DESC) {
-      if (source.startsWith(symbol, index)) {
-        matched = symbol;
-        break;
-      }
-    }
-
-    if (matched) {
-      glyphs.push(GLYPH_BY_LATIN[matched]);
-      index += matched.length;
-      continue;
-    }
-
-    glyphs.push(source[index]);
-    index += 1;
-  }
-
-  return glyphs.join('');
-}
-
-const ALPHABET_LETTERS = [
-  ['a', 'aurek'], ['b', 'besh'], ['c', 'cresh'], ['d', 'dorn'], ['e', 'esk'], ['f', 'forn'],
-  ['g', 'grek'], ['h', 'herf'], ['i', 'isk'], ['j', 'jenth'], ['k', 'krill'], ['l', 'leth'],
-  ['m', 'mern'], ['n', 'nern'], ['o', 'osk'], ['p', 'peth'], ['q', 'qek'], ['r', 'resh'],
-  ['s', 'senth'], ['t', 'trill'], ['u', 'usk'], ['v', 'vev'], ['w', 'wesk'], ['x', 'xesh'],
-  ['yy', 'yirt'], ['z', 'zerek'], ['ch', 'cherek'], ['ae', 'enth'], ['eo', 'onith'], ['kh', 'krenth'],
-  ['ng', 'nen'], ['oo', 'orenth'], ['sh', 'shen'], ['th', 'thesh'],
-].map(([latin, name], idx) => ({ id: idx + 1, latin, name, symbol: getGlyphSymbol(latin), type: 'alphabet' }));
-
-const NUMBER_GLYPHS = Array.from({ length: 10 }, (_, n) => ({
-  id: 100 + n,
-  latin: String(n),
-  name: `numeral ${n}`,
-  symbol: getGlyphSymbol(String(n)),
-  type: 'numbers',
-}));
-
-const DOUBLE_LATIN = new Set(['yy', 'ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
-const PRONUNCIATION_LATIN = new Set(['ch', 'ae', 'eo', 'kh', 'ng', 'oo', 'sh', 'th']);
-const DOUBLE_LETTERS = ALPHABET_LETTERS.filter((letter) => DOUBLE_LATIN.has(letter.latin));
-const PRONUNCIATION_LETTERS = ALPHABET_LETTERS.filter((letter) => PRONUNCIATION_LATIN.has(letter.latin));
+const DIGRAPH_LETTERS = ALPHABET_LETTERS.filter((letter) => letter.latin.length > 1);
+const PRONUNCIATION_LETTERS = DIGRAPH_LETTERS;
 const ALL_LEARNING_ITEMS = [...ALPHABET_LETTERS, ...NUMBER_GLYPHS];
 
 const SECTION_COUNT = 6;
@@ -67,7 +37,7 @@ const SKIP_SECTION_INCREMENT = 2;
 
 const learningTracks = {
   standard: makeLearningTrack(ALPHABET_LETTERS, SECTION_COUNT, 'Aurebesh'),
-  double: makeLearningTrack(DOUBLE_LETTERS, Math.min(4, DOUBLE_LETTERS.length), 'Double-Letter'),
+  double: makeLearningTrack(DIGRAPH_LETTERS, Math.min(4, DIGRAPH_LETTERS.length), 'Double-Letter'),
   pronunciation: makeLearningTrack(PRONUNCIATION_LETTERS, Math.min(4, PRONUNCIATION_LETTERS.length), 'Pronunciation'),
   numbers: makeLearningTrack(NUMBER_GLYPHS, 4, 'Numbers'),
 };
@@ -306,7 +276,7 @@ function launchQuizOnly() {
 
   if (!picked.length) picked = ALPHABET_LETTERS;
 
-  if (state.quizExtras.double) picked.push(...DOUBLE_LETTERS);
+  if (state.quizExtras.double) picked.push(...DIGRAPH_LETTERS);
   if (state.quizExtras.pronunciation) picked.push(...PRONUNCIATION_LETTERS);
   if (state.quizExtras.numbers) picked.push(...NUMBER_GLYPHS);
 
@@ -381,6 +351,7 @@ function renderStudy() {
           <article class="card">
             <div class="symbol">${l.symbol}</div>
             <div class="latin">${l.latin}</div>
+            <div class="meta">${l.pronunciation}</div>
           </article>`).join('')}
       </div>
     </section>
@@ -465,7 +436,7 @@ function renderQuizSetup() {
         <label class="pill">
           <input type="checkbox" ${state.quizExtras.double ? 'checked' : ''}
             onchange="state.quizExtras.double = this.checked" />
-          Double Letters (${DOUBLE_LETTERS.length})
+          Double Letters (${DIGRAPH_LETTERS.length})
         </label>
         <label class="pill">
           <input type="checkbox" ${state.quizExtras.pronunciation ? 'checked' : ''}
